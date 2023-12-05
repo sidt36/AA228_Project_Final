@@ -1,5 +1,6 @@
-using POMDPs, QuickPOMDPs, POMDPTools, QMDP
+using POMDPs, QuickPOMDPs, POMDPTools
 using LinearAlgebra
+using DiscreteValueIteration
 
 n = 2
 
@@ -20,10 +21,11 @@ end
 function reward(s,goal = Vector([15,15]))
   Points = Dict()
   reward = 0
-  print(size(s))
-  n = Int(size(s,2)/2)
+  #print(size(s))
+  n = Int(length(s)/2)
+  s_vector=[i for i=s]
   for i =  1:n
-    Points[i] = s[2*i-1:2*i]
+    Points[i] = s_vector[2*i-1:2*i]
     d = norm(goal -Points[i])
     spread = 3
     if (d==0)
@@ -34,7 +36,7 @@ function reward(s,goal = Vector([15,15]))
 
   end
   
-  reward -= out_of_bounds(s)*100
+  reward -= out_of_bounds(s_vector)*100
 
   for i = 0:n-1
     for j = 1:n-i-1
@@ -66,10 +68,11 @@ function Transition(s,a)
   actions = Dict()
   direction_list = []
   probability_list = []
+  s_vector=[i for i=s]
   T = Dict()
-  n = Int(size(s,2)/2)
+  n = Int(size(s,1)/2)
   for i = 1:n
-    Points[i] = s[2*i-1:2*i]
+    Points[i] = s_vector[2*i-1:2*i]
     ai = a[i]
     theta = Int((ai-1)/8*360)
     theta_l = Int((ai-1)/8*360) + 45
@@ -118,8 +121,9 @@ end
 #println(Transition([15 15 15 15],[1 1]))
 
 function state_space(n=3)
-    state_list = [append!(collect(1:30),-1) for p = 1:2*n]
+    state_list = [collect(1:30) for p = 1:2*n]
     states = collect(reduce(vcat,((Iterators.product(state_list...)))))
+    push!(states,(-1,-1))
     return states
 end
 
@@ -128,7 +132,7 @@ function action_space(n=3)
         action_list = [collect(1:8) for p = 1:n]
         actions = collect(reduce(vcat,((Iterators.product(action_list...)))))
     else
-        actions = [tuple(i) for i=1:8]
+        actions = [i for i=1:8]
     end
     return actions
 end
@@ -146,27 +150,25 @@ end
 # end
 # println("Undiscounted reward was $rsum.")
 ns = 1
-m = QuickPOMDP(
+m = QuickMDP(
     states = state_space(ns) ,
     actions = action_space(ns) ,
-    initialstate = Uniform(state_space(ns)),
+    #initialstate = Uniform(state_space(ns)),
+    initialstate=Deterministic((25,28)),
     discount = 0.95,
 
     transition = function (s, a)
-       transisition_dict = Transition(s,a)
-       state_list = state_space(ns) 
-       probabs = []
-       for s1 in state_list
-            if (s1 in keys(transisition_dict))
-                append!(probabs, transisition_dict(s1))
-            else
-                append!(0, transisition_dict(s1))
-            end
-        end
-            return SparseCat(state_list, probabs)
+       transition_dict = Transition(s,a)
+       transition_tuples=[]
+       for key in keys(transition_dict)
+        push!(transition_tuples,Tuple(Tuple(key[1])))
+       end
+       #state_list = state_space(ns) 
+       #probabs = []
+      return SparseCat(transition_tuples,values(transition_dict))
     end,
 
-    observation = function (s, a, sp)
+    #= observation = function (s, a, sp)
         state_list = state_space(ns)
         probab = []
         for s1 in state_list
@@ -178,19 +180,17 @@ m = QuickPOMDP(
              
         end    
         return SparseCat(state_list, probabs)
-    end,
+    end, =#
 
     reward = function (s, a)
         return reward(s)
     end
 )
 
-solver = QMDPSolver()
+solver = ValueIterationSolver(max_iterations=300, belres=1e-3, verbose=True)
 policy = solve(solver, m)
+print("running simulation")
+hr = HistoryRecorder(max_steps=20)
+#h = simulate(hr, m, policy)
+#print(Transition([17,19],1))
 
-rsum = 0.0
-for (s,b,a,o,r) in stepthrough(m, policy, "s,b,a,o,r", max_steps=10)
-    println("s: $s, b: $([s=>pdf(b,s) for s in states(m)]), a: $a, o: $o")
-    global rsum += r
-end
-println("Undiscounted reward was $rsum.")
