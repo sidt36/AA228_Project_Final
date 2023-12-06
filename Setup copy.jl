@@ -1,8 +1,17 @@
 using POMDPs, QuickPOMDPs, POMDPTools
 using LinearAlgebra
 using DiscreteValueIteration
+using POMDPSimulators
+using MCTS
+using Plots
+using ElectronDisplay
+using Plots
+ElectronDisplay.CONFIG.single_window = true
+plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 6,legend = false)
 
-n = 2
+
+
+
 
 
 function initialize(num_states=1,num_aircrafts = 3)
@@ -89,9 +98,9 @@ function Transition(s,a)
     p = 1
     tup = []
     for i = 0:n-1
-      if (all(Points[i+1]==goal))
+      if (all(Points[i+1]'==goal))
         t[i+1] = goal
-        p = p*probability_list[idx][i]
+        p = p*probability_list[idx][i+1]
       else
         t[i+1] = next_states(Points[i+1]',ds[i+1])
         p = p*probability_list[idx][i+1]
@@ -126,6 +135,18 @@ function state_space(n=3)
     push!(states,(-1,-1))
     return states
 end
+function statespace(n=1)
+  #print(n)
+  if n==1
+      list=vec([(i,j) for i=1:30,j=1:30])
+      push!(list,(-1,-1))
+      return list
+  end
+  low_list=statespace(n-1)
+  one_list=statespace(1)
+  list=vec([(i...,j...) for i=low_list,j=one_list])
+  return list
+end
 
 function action_space(n=3)
     if (n>1)
@@ -150,13 +171,13 @@ end
 # end
 # println("Undiscounted reward was $rsum.")
 ns = 1
-m = QuickMDP(
-    states = state_space(ns) ,
+m1 = QuickMDP(
+    states = statespace(ns) ,
     actions = action_space(ns) ,
     #initialstate = Uniform(state_space(ns)),
     initialstate=Deterministic((25,28)),
-    discount = 0.95,
-
+    discount = 0.8,
+    isterminal = s -> any([e == -1 for e in s]),
     transition = function (s, a)
        transition_dict = Transition(s,a)
        transition_tuples=[]
@@ -184,13 +205,79 @@ m = QuickMDP(
 
     reward = function (s, a)
         return reward(s)
+    end,
+    render = function (step)
+      cx = step.s[1:2:ns*2]
+      cy = step.s[2:2:ns*2]
+      
+
+      return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false)
+    end
+)
+ns=2
+m2 = QuickMDP(
+    states = statespace(ns) ,
+    actions = action_space(ns) ,
+    #initialstate = Uniform(state_space(ns)),
+    initialstate=Deterministic((25,28,1,2)),
+    discount = 0.8,
+    isterminal = s -> any([e == -1 for e in s]),
+    transition = function (s, a)
+       transition_dict = Transition(s,a)
+       transition_tuples=[]
+       for key in keys(transition_dict)
+        push!(transition_tuples,Tuple(Tuple(key[1])))
+       end
+       #state_list = state_space(ns) 
+       #probabs = []
+      return SparseCat(transition_tuples,collect(values(transition_dict)))
+    end,
+
+    #= observation = function (s, a, sp)
+        state_list = state_space(ns)
+        probab = []
+        for s1 in state_list
+            if (all(s1 == sp))
+                append!(probabs, 1)
+            else
+                append!(probabs, 0)
+            end
+             
+        end    
+        return SparseCat(state_list, probabs)
+    end, =#
+
+    reward = function (s, a)
+        return reward(s)
+    end,
+    render = function (step)
+      cx = [step.s[i] for i = 1:2:2*ns]
+      cy = [step.s[i] for i = 2:2:2*ns]
+      color = [:blue, :red,:green]
+      return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false, color = color[1:ns])
     end
 )
 
-solver = ValueIterationSolver(max_iterations=300, belres=1e-3, verbose=True)
-policy = solve(solver, m)
-print("running simulation")
-hr = HistoryRecorder(max_steps=20)
-#h = simulate(hr, m, policy)
-#print(Transition([17,19],1))
+
+solvervi = ValueIterationSolver(max_iterations=3000, belres=1e-2, verbose=true)
+policy = solve(solvervi, m1)
+function vi_estimate(mdp,s,depth)
+  n=length(s)/2
+  value_estimate=0
+  for i=1:n
+    value_estimate+=value(policy, (s[2*i-1],s[2*i]))
+  end
+  return value_estimate
+end
+solver_mcts = MCTSSolver(n_iterations=50, depth=20, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
+planner_mcts = solve(solver_mcts, m2)
+ds = DisplaySimulator()
+simulate(ds,m2,planner_mcts)
+
+#print("running simulation")
+#hr = HistoryRecorder(max_steps=150)
+#roller=RolloutSimulator(max_steps=20)
+#h = simulate(hr, m2, planner_mcts)
+#print(test((25,28,2,4),(2,3)))
+#collect(eachstep(h, "s,a"))
 
