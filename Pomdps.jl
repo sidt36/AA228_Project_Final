@@ -6,8 +6,9 @@ using MCTS
 using Plots
 using ElectronDisplay
 using Plots
-using SARSOP
+#using SARSOP
 using QMDP
+using AdaOPS
 ElectronDisplay.CONFIG.single_window = true
 plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 6,legend = false)
 
@@ -250,6 +251,7 @@ m2 = QuickPOMDP(
     #initialstate = Uniform(state_space(ns)),
     initialstate=Uniform([(9,4,25,28),(10,4,25,27)]),
     discount = 0.8,
+    observations = statespace(ns),
     isterminal = s -> any([e == -1 for e in s]),
     transition = function (s, a)
        transition_dict = Transition(s,a)
@@ -296,7 +298,7 @@ m2 = QuickPOMDP(
 println(observation_fn((1,2),1,(1,2)))
 
 solvervi = QMDPSolver(verbose=true)
-policy = solve(solvervi, m1)
+policy = solve(solvervi, m2)
 
 function vi_estimate(mdp,s,depth)
   n=length(s)/2
@@ -306,15 +308,17 @@ function vi_estimate(mdp,s,depth)
   end
   return value_estimate
 end
-
+#adaoposolver = AdaOPSSolver(bounds=IndependentBounds(-750, 495))
+#adapolicy=solve(adaoposolver,m2)
 rsum = 0.0
-for (s,b,a,o,r) in stepthrough(m1, policy, "s,b,a,o,r", max_steps=35)
+for (s,b,a,o,r) in stepthrough(m2, policy, "s,b,a,o,r", max_steps=35)
     println("s: $s, a: $a, o: $o")
     global rsum += r
 end
-println("Undiscounted reward was $rsum.")
-solver_A = (n_iterations=1000, depth=30, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
-planner_mcts = solve(solver_mcts, m2)
+rsum
+#println("Undiscounted reward was $rsum.")
+#solver_A = (n_iterations=1000, depth=30, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
+#planner_mcts = solve(solver_mcts, m2)
 # #reward((1,2,1,2))
 # ds = DisplaySimulator()
 # simulate(ds,m2,planner_mcts)
