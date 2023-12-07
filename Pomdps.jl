@@ -6,12 +6,50 @@ using MCTS
 using Plots
 using ElectronDisplay
 using Plots
+using SARSOP
+using QMDP
 ElectronDisplay.CONFIG.single_window = true
 plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 6,legend = false)
 
 
 
+function observation_fn(s,a,sp)
 
+  n = length(sp)/2
+  states = [sp]
+  probabs = [0.8]
+
+  p = 0.2/(4*n)
+
+
+  for i = 1:2*n
+    tup1 = []
+    tup2 = []
+    count = 1
+    for e in sp
+      if (count == i)
+      append!(tup1,e+1)
+      append!(tup2,e-1)
+      else
+      append!(tup1,e)
+      append!(tup2,e)
+      end
+      count+=1
+    end
+
+    t1 = Tuple(e for e in tup1)
+    t2 = Tuple(e for e in tup2)
+
+    append!(states,[t1])
+    append!(probabs,[p])
+
+    append!(states,[t2])
+    append!(probabs,[p])
+
+  end
+  return SparseCat(states,probabs)
+
+end
 
 
 function initialize(num_states=1,num_aircrafts = 3)
@@ -169,13 +207,14 @@ end
 # end
 # println("Undiscounted reward was $rsum.")
 ns = 1
-m1 = QuickMDP(
+m1 = QuickPOMDP(
     states = statespace(ns) ,
     actions = action_space(ns) ,
     #initialstate = Uniform(state_space(ns)),
     initialstate=Deterministic((25,28)),
+    observations = statespace(ns),
     discount = 0.8,
-    isterminal = s -> any([e == -1 for e in s]),
+    #isterminal = s -> any([e == -1 for e in s]),
     transition = function (s, a)
        transition_dict = Transition(s,a)
        transition_tuples=[]
@@ -184,40 +223,32 @@ m1 = QuickMDP(
        end
        #state_list = state_space(ns) 
        #probabs = []
-      return SparseCat(transition_tuples,values(transition_dict))
+      return SparseCat(transition_tuples,collect(values(transition_dict)))
     end,
 
-    #= observation = function (s, a, sp)
-        state_list = state_space(ns)
-        probab = []
-        for s1 in state_list
-            if (all(s1 == sp))
-                append!(probabs, 1)
-            else
-                append!(probabs, 0)
-            end
-             
-        end    
-        return SparseCat(state_list, probabs)
-    end, =#
+
 
     reward = function (s, a)
         return reward(s)
     end,
+
     render = function (step)
       cx = step.s[1:2:ns*2]
       cy = step.s[2:2:ns*2]
-      
-
       return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false)
+    end,
+
+    observation = function (s,a,sp)
+      return observation_fn(s,a,sp)
     end
+    
 )
 ns=2
-m2 = QuickMDP(
+m2 = QuickPOMDP(
     states = statespace(ns) ,
     actions = action_space(ns) ,
     #initialstate = Uniform(state_space(ns)),
-    initialstate=Deterministic((11,12,11,13)),
+    initialstate=Uniform([(9,4,25,28),(10,4,25,27)]),
     discount = 0.8,
     isterminal = s -> any([e == -1 for e in s]),
     transition = function (s, a)
@@ -253,12 +284,20 @@ m2 = QuickMDP(
       cy = [step.s[i] for i = 2:2:2*ns]
       color = [:blue, :red,:green]
       return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false, color = color[1:ns])
+    end,
+
+    observation = function (s,a,sp)
+      return observation_fn(s,a,sp)
     end
+    
+
 )
 
+println(observation_fn((1,2),1,(1,2)))
 
-solvervi = ValueIterationSolver(max_iterations=3000, belres=1e-2, verbose=true)
+solvervi = QMDPSolver(verbose=true)
 policy = solve(solvervi, m1)
+
 function vi_estimate(mdp,s,depth)
   n=length(s)/2
   value_estimate=0
@@ -267,11 +306,18 @@ function vi_estimate(mdp,s,depth)
   end
   return value_estimate
 end
-solver_mcts = MCTSSolver(n_iterations=1000, depth=30, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
+
+rsum = 0.0
+for (s,b,a,o,r) in stepthrough(m1, policy, "s,b,a,o,r", max_steps=35)
+    println("s: $s, a: $a, o: $o")
+    global rsum += r
+end
+println("Undiscounted reward was $rsum.")
+solver_A = (n_iterations=1000, depth=30, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
 planner_mcts = solve(solver_mcts, m2)
-#reward((1,2,1,2))
-ds = DisplaySimulator()
-simulate(ds,m2,planner_mcts)
+# #reward((1,2,1,2))
+# ds = DisplaySimulator()
+# simulate(ds,m2,planner_mcts)
 
 #print("running simulation")
 #r = HistoryRecorder(max_steps=150)

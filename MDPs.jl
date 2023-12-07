@@ -6,6 +6,7 @@ using MCTS
 using Plots
 using ElectronDisplay
 using Plots
+
 ElectronDisplay.CONFIG.single_window = true
 plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 6,legend = false)
 
@@ -45,7 +46,7 @@ function reward(s,goal = Vector([15,15]))
 
   end
   
-  reward -= out_of_bounds(s_vector)*150
+  reward -= out_of_bounds(s_vector)*200
 
   for i = 0:n-1
     for j = 1:n-i-1
@@ -184,7 +185,7 @@ m1 = QuickMDP(
        end
        #state_list = state_space(ns) 
        #probabs = []
-      return SparseCat(transition_tuples,values(transition_dict))
+      return SparseCat(transition_tuples,collect(values(transition_dict)))
     end,
 
     #= observation = function (s, a, sp)
