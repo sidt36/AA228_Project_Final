@@ -9,18 +9,19 @@ using Plots
 #using SARSOP
 using QMDP
 using AdaOPS
+using ARDESPOT
 ElectronDisplay.CONFIG.single_window = true
 plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 6,legend = false)
 
 
 
-function observation_fn(s,a,sp)
+function observation_fn(sp)
 
   n = length(sp)/2
   states = [sp]
-  probabs = [0.8]
+  probabs = [0.99]
 
-  p = 0.2/(4*n)
+  p = 0.01/(4*n)
 
 
   for i = 1:2*n
@@ -29,8 +30,8 @@ function observation_fn(s,a,sp)
     count = 1
     for e in sp
       if (count == i)
-      append!(tup1,e+1)
-      append!(tup2,e-1)
+      append!(tup1,min(e+1,30))
+      append!(tup2,max(e-1,1))
       else
       append!(tup1,e)
       append!(tup2,e)
@@ -75,10 +76,10 @@ function reward(s,goal = Vector([15,15]))
   for i =  1:n
     Points[i] = s_vector[2*i-1:2*i]
     d = norm(goal -Points[i])
-    spread = 3
+    spread = 7
     if (d==0)
       reward+=100
-    elseif  (d<8)
+    elseif  (d<10)
       reward+= 100*exp(-d/spread)
     end  
 
@@ -239,8 +240,8 @@ m1 = QuickPOMDP(
       return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false)
     end,
 
-    observation = function (s,a,sp)
-      return observation_fn(s,a,sp)
+    observation = function (a,sp)
+      return observation_fn(sp)
     end
     
 )
@@ -249,7 +250,8 @@ m2 = QuickPOMDP(
     states = statespace(ns) ,
     actions = action_space(ns) ,
     #initialstate = Uniform(state_space(ns)),
-    initialstate=Uniform([(9,4,25,28),(10,4,25,27)]),
+    #initialstate=Uniform([(9,9,18,17),(9,10,19,17)]),
+    initialstate=Deterministic((9,9,18,17)),
     discount = 0.8,
     observations = statespace(ns),
     isterminal = s -> any([e == -1 for e in s]),
@@ -288,45 +290,48 @@ m2 = QuickPOMDP(
       return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false, color = color[1:ns])
     end,
 
-    observation = function (s,a,sp)
-      return observation_fn(s,a,sp)
+    observation = function (a,sp)
+      return observation_fn(sp)
     end
     
 
 )
 
-println(observation_fn((1,2),1,(1,2)))
+#println(observation_fn((1,2,3,4),1,(1,2,3,4)))
 
+#solvervi = QMDPSolver(verbose=true)
+#policy = solve(solvervi, m1)
+#observation_fn((3,4,5,6))
+
+# function vi_estimate(mdp,s,depth)
+#   n=length(s)/2
+#   value_estimate=0
+#   for i=1:n
+#     value_estimate+=value(policy, (s[2*i-1],s[2*i]))
+#   end
+#   return value_estimate
+# end
+#adaoposolver = DESPOTSolver(bounds=(-1000, 1000))
 solvervi = QMDPSolver(verbose=true)
-policy = solve(solvervi, m2)
-
-function vi_estimate(mdp,s,depth)
-  n=length(s)/2
-  value_estimate=0
-  for i=1:n
-    value_estimate+=value(policy, (s[2*i-1],s[2*i]))
-  end
-  return value_estimate
-end
-#adaoposolver = AdaOPSSolver(bounds=IndependentBounds(-750, 495))
-#adapolicy=solve(adaoposolver,m2)
-rsum = 0.0
-for (s,b,a,o,r) in stepthrough(m2, policy, "s,b,a,o,r", max_steps=35)
-    println("s: $s, a: $a, o: $o")
-    global rsum += r
-end
-rsum
+adapolicy=solve(solvervi,m2)
+#  rsum = 0.0
+#  for (s,b,a,o,r) in stepthrough(m2, adapolicy, "s,b,a,o,r", max_steps=35)
+#      println("s: $s, a: $a, o: $o")
+#      global rsum += r
+#  end
+#  rsum
 #println("Undiscounted reward was $rsum.")
 #solver_A = (n_iterations=1000, depth=30, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
 #planner_mcts = solve(solver_mcts, m2)
 # #reward((1,2,1,2))
-# ds = DisplaySimulator()
-# simulate(ds,m2,planner_mcts)
+ds = DisplaySimulator()
+simulate(ds,m2,adapolicy)
+# planner = solve(MCTS_Greedy_Solver, m2)
 
-#print("running simulation")
-#r = HistoryRecorder(max_steps=150)
-#roller=RolloutSimulator(max_steps=20)
-#h = simulate(hr, m2, planner_mcts)
+# print("running simulation")
+# hr = HistoryRecorder(max_steps=20)
+# roller=RolloutSimulator(max_steps=20)
+# h = simulate(hr, m2, planner)
 #print(test((25,28,2,4),(2,3)))
 #collect(eachstep(h, "s,a"))
 
