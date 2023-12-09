@@ -1,0 +1,20 @@
+2 Aircrafts
+
+ Row │ policy                  reward    
+     │ String?                 Float64?  
+─────┼───────────────────────────────────
+   1 │ Value Iteration Policy    82.7082
+   2 │ Random                  -154.286
+_________________________
+
+
+1 Aircraft
+________________________________
+Running Monte Carlo Simulation
+2×2 DataFrame
+ Row │ policy                  reward   
+     │ String?                 Float64? 
+─────┼──────────────────────────────────
+   1 │ Value Iteration Policy   40.6334
+   2 │ Random                    0.0
+_________________________
