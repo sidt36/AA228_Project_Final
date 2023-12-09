@@ -2,18 +2,57 @@ using POMDPs, QuickPOMDPs, POMDPTools
 using LinearAlgebra
 using DiscreteValueIteration
 using POMDPSimulators
-using MCTS
 using Plots
 using ElectronDisplay
 using Plots
+using QMDP
+#using ARDESPOT
+using Statistics
 using Random
+using StatsBase
 
 ElectronDisplay.CONFIG.single_window = true
-plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 6,legend = false)
+plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 8,legend = false,color = :green)
 
 
 
+function observation_fn(sp)
 
+  n = length(sp)/2
+  states = [sp]
+  probabs = [0.8]
+
+  p = 0.2/(4*n)
+
+
+  for i = 1:2*n
+    tup1 = []
+    tup2 = []
+    count = 1
+    for e in sp
+      if (count == i)
+      append!(tup1,min(e+1,30))
+      append!(tup2,max(e-1,1))
+      else
+      append!(tup1,e)
+      append!(tup2,e)
+      end
+      count+=1
+    end
+
+    t1 = Tuple(e for e in tup1)
+    t2 = Tuple(e for e in tup2)
+
+    append!(states,[t1])
+    append!(probabs,[p])
+
+    append!(states,[t2])
+    append!(probabs,[p])
+
+  end
+  return SparseCat(states,probabs)
+
+end
 
 
 function initialize(num_states=1,num_aircrafts = 3)
@@ -38,16 +77,16 @@ function reward(s,goal = Vector([15,15]))
   for i =  1:n
     Points[i] = s_vector[2*i-1:2*i]
     d = norm(goal -Points[i])
-    spread = 3
+    spread = 7
     if (d==0)
       reward+=100
-    elseif  (d<8)
+    elseif  (d<10)
       reward+= 100*exp(-d/spread)
     end  
 
   end
   
-  reward -= out_of_bounds(s_vector)*200
+  reward -= out_of_bounds(s_vector)*150
 
   for i = 0:n-1
     for j = 1:n-i-1
@@ -171,13 +210,14 @@ end
 # end
 # println("Undiscounted reward was $rsum.")
 ns = 1
-m1 = QuickMDP(
+m1 = QuickPOMDP(
     states = statespace(ns) ,
     actions = action_space(ns) ,
-    #initialstate = Uniform(state_space(ns)),
-    initialstate=Deterministic((25,28)),
+    initialstate = Uniform(state_space(ns)),
+    #initialstate=Deterministic((25,28)),
+    observations = statespace(ns),
     discount = 0.8,
-    isterminal = s -> any([e == -1 for e in s]),
+    #isterminal = s -> any([e == -1 for e in s]),
     transition = function (s, a)
        transition_dict = Transition(s,a)
        transition_tuples=[]
@@ -189,111 +229,144 @@ m1 = QuickMDP(
       return SparseCat(transition_tuples,collect(values(transition_dict)))
     end,
 
-    #= observation = function (s, a, sp)
-        state_list = state_space(ns)
-        probab = []
-        for s1 in state_list
-            if (all(s1 == sp))
-                append!(probabs, 1)
-            else
-                append!(probabs, 0)
-            end
-             
-        end    
-        return SparseCat(state_list, probabs)
-    end, =#
+
 
     reward = function (s, a)
         return reward(s)
     end,
-    render = function (step)
-      cx = step.s[1:2:ns*2]
-        cy = step.s[2:2:ns*2]
-        cx = [e for e in cx]
-        cy = [e for e in cy]
-        color = [:blue, :red,:green]
-        return plot!(cx,cy,xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false,color = color[1:ns])
-    end
-)
-ns=2
-m2 = QuickMDP(
-    states = statespace(ns) ,
-    actions = action_space(ns) ,
-    #initialstate = Uniform(state_space(ns)),
-    initialstate=Deterministic((10,4,15,3)),
-    discount = 0.8,
-    isterminal = s -> any([e == -1 for e in s]),
-    transition = function (s, a)
-       transition_dict = Transition(s,a)
-       transition_tuples=[]
-       for key in keys(transition_dict)
-        push!(transition_tuples,Tuple(Tuple(key[1])))
-       end
-       #state_list = state_space(ns) 
-       #probabs = []
-      return SparseCat(transition_tuples,collect(values(transition_dict)))
-    end,
 
-    #= observation = function (s, a, sp)
-        state_list = state_space(ns)
-        probab = []
-        for s1 in state_list
-            if (all(s1 == sp))
-                append!(probabs, 1)
-            else
-                append!(probabs, 0)
-            end
+    render = function (step)
+        cx = [step.s[i] for i = 1:2:2*ns]
+        cy = [step.s[i] for i = 2:2:2*ns]
+        println(pdf(step.b, step.s))
+        color = [:blue, :red,:green]
+        return plot!(cx,cy,xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 4*pdf(step.b, step.s),legend = false, color = color[1:ns])
+      end,
+  
+
+    observation = function (a,sp)
+      return observation_fn(sp)
+    end
+    
+)
+# ns=2
+# m2 = QuickPOMDP(
+#     states = statespace(ns) ,
+#     actions = action_space(ns) ,
+#     initialstate = Uniform(state_space(ns)),
+#     #initialstate=Uniform([(9,9,18,17),(9,10,19,17)]),
+#     #initialstate=Deterministic((9,9,18,17)),
+#     discount = 0.8,
+#     observations = statespace(ns),
+#     isterminal = s -> any([e == -1 for e in s]),
+#     transition = function (s, a)
+#        transition_dict = Transition(s,a)
+#        transition_tuples=[]
+#        for key in keys(transition_dict)
+#         push!(transition_tuples,Tuple(Tuple(key[1])))
+#        end
+#        #state_list = state_space(ns) 
+#        #probabs = []
+#       return SparseCat(transition_tuples,collect(values(transition_dict)))
+#     end,
+
+#     #= observation = function (s, a, sp)
+#         state_list = state_space(ns)
+#         probab = []
+#         for s1 in state_list
+#             if (all(s1 == sp))
+#                 append!(probabs, 1)
+#             else
+#                 append!(probabs, 0)
+#             end
              
-        end    
-        return SparseCat(state_list, probabs)
-    end, =#
+#         end    
+#         return SparseCat(state_list, probabs)
+#     end, =#
 
-    reward = function (s, a)
-        return reward(s)
-    end,
-    render = function (step)
-        cx = step.s[1:2:ns*2]
-        cy = step.s[2:2:ns*2]
-        cx = [e for e in cx]
-        cy = [e for e in cy]
-        color = [:blue, :red,:green]
-        return plot!(cx,cy,xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false,color = color[1:ns])
-    end
-)
+#     reward = function (s, a)
+#         return reward(s)
+#     end,
+#     render = function (step)
+#       cx = [step.s[i] for i = 1:2:2*ns]
+#       cy = [step.s[i] for i = 2:2:2*ns]
 
-println("Solving Single Aircraft Case")
-solvervi = ValueIterationSolver(max_iterations=3000, belres=1e-2, verbose=true)
-policy = solve(solvervi, m1)
-function vi_estimate(mdp,s,depth)
-  n=length(s)/2
-  value_estimate=0
-  for i=1:n
-    value_estimate+=value(policy, (s[2*i-1],s[2*i]))
-  end
-  return value_estimate
-end
+#       println(step.b)
 
-solver_mcts = MCTSSolver(n_iterations=1000, depth=30, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
-planner_mcts = solve(solver_mcts, m2)
-rnd = solve(RandomSolver(MersenneTwister(7)), m2)
 
+#       color = [:blue, :red,:green]
+#       return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false, color = color[1:ns])
+#     end,
+
+#     observation = function (a,sp)
+#       return observation_fn(sp)
+#     end
+    
+
+# )
+
+#println(observation_fn((1,2,3,4),1,(1,2,3,4)))
+
+#solvervi = QMDPSolver(verbose=true)
+#policy = solve(solvervi, m1)
+#observation_fn((3,4,5,6))
+
+# function vi_estimate(mdp,s,depth)
+#   n=length(s)/2
+#   value_estimate=0
+#   for i=1:n
+#     value_estimate+=value(policy, (s[2*i-1],s[2*i]))
+#   end
+#   return value_estimate
+# end
+#adaoposolver = DESPOTSolver(bounds=(-1000, 1000))
+#solvervi = QMDPSolver(verbose=true)
+#adapolicy=solve(solvervi,m2)
+#  rsum = 0.0
+#  for (s,b,a,o,r) in stepthrough(m2, adapolicy, "s,b,a,o,r", max_steps=35)
+#      println("s: $s, a: $a, o: $o")
+#      global rsum += r
+#  end
+#  rsum
+#println("Undiscounted reward was $rsum.")
+#solver_A = (n_iterations=1000, depth=30, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
+#planner_mcts = solve(solver_mcts, m2)
+# #reward((1,2,1,2))
+#ds = DisplaySimulator()
+#simulate(ds,m2,adapolicy)
+# planner = solve(MCTS_Greedy_Solver, m2)
+
+# print("running simulation")
+# hr = HistoryRecorder(max_steps=20)
+# roller=RolloutSimulator(max_steps=20)
+# h = simulate(hr, m2, planner)
+#print(test((25,28,2,4),(2,3)))
+#collect(eachstep(h, "s,a"))
+
+solvervi = QMDPSolver(verbose=true)
+policy=solve(solvervi,m1)
+
+rnd = solve(RandomSolver(MersenneTwister(7)), m1)
 hr = HistoryRecorder(max_steps=150)
-
 roller=RolloutSimulator(max_steps=20)
 
-h = simulate(roller, m2, planner_mcts)
+h = simulate(roller, m1, policy)
+
 
 println("The discounted reward from one simulation is")
 @show h
 println("________________________________")
+
+
 q = [] # vector of the simulations to be run
-push!(q, Sim(m2, planner_mcts, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Value Iteration Policy")))
-push!(q, Sim(m2, rnd, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Random")))
+push!(q, Sim(m1, policy, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"QMDP Policy")))
+push!(q, Sim(m1, rnd, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Random")))
+
 println("Running Monte Carlo Simulation")
+
 data = run_parallel(q,proc_warn=false)
 println(data)
 println("_________________________")
 
 ds = DisplaySimulator(max_steps = 25)
-simulate(ds,m2,planner_mcts)
-
+simulate(ds,m1,policy)

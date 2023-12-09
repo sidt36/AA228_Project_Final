@@ -227,7 +227,6 @@ q = [] # vector of the simulations to be run
 push!(q, Sim(m1, policy, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Value Iteration Policy")))
 push!(q, Sim(m1, rnd, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Random")))
 
-# this creates two simulations, one with the feed-when-crying policy and one with a random policy
 println("Running Monte Carlo Simulation")
 
 data = run_parallel(q,proc_warn=false)

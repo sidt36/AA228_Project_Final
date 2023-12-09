@@ -1,0 +1,10 @@
+1 aircraft
+________________________________
+Running Monte Carlo Simulation
+2×2 DataFrame
+ Row │ policy       reward    
+     │ String?      Float64?  
+─────┼────────────────────────
+   1 │ QMDP Policy    73.3886
+   2 │ Random       -958.143
+_________________________
