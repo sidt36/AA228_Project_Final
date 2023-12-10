@@ -5,7 +5,9 @@ using POMDPSimulators
 using MCTS
 using Plots
 using ElectronDisplay
-using Plots
+using Plots; pythonplot()
+
+using Random
 
 ElectronDisplay.CONFIG.single_window = true
 plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 6,legend = false)
@@ -207,10 +209,11 @@ m1 = QuickMDP(
     end,
     render = function (step)
       cx = step.s[1:2:ns*2]
-      cy = step.s[2:2:ns*2]
-      
-
-      return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false)
+        cy = step.s[2:2:ns*2]
+        cx = [e for e in cx]
+        cy = [e for e in cy]
+        color = [:blue, :red,:green]
+        return plot!(cx,cy,xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false,color = color[1:ns])
     end
 )
 ns=2
@@ -218,7 +221,7 @@ m2 = QuickMDP(
     states = statespace(ns) ,
     actions = action_space(ns) ,
     #initialstate = Uniform(state_space(ns)),
-    initialstate=Deterministic((11,12,11,13)),
+    initialstate=Deterministic((10,4,15,3)),
     discount = 0.8,
     isterminal = s -> any([e == -1 for e in s]),
     transition = function (s, a)
@@ -250,34 +253,44 @@ m2 = QuickMDP(
         return reward(s)
     end,
     render = function (step)
-      cx = [step.s[i] for i = 1:2:2*ns]
-      cy = [step.s[i] for i = 2:2:2*ns]
-      color = [:blue, :red,:green]
-      return plot!(Vector(cx),Vector(cy),xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false, color = color[1:ns])
+        cx = step.s[1:2:ns*2]
+        cy = step.s[2:2:ns*2]
+        cx = [e for e in cx]
+        cy = [e for e in cy]
+        color = [:blue, :red,:green]
+        return plot!(cx,cy,xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 2,legend = false,color = color[1:ns])
     end
 )
 
-
+println("Solving Single Aircraft Case")
 solvervi = ValueIterationSolver(max_iterations=3000, belres=1e-2, verbose=true)
 policy = solve(solvervi, m1)
-function vi_estimate(mdp,s,depth)
-  n=length(s)/2
+function vi_estimate(x,y)
+  s = (x,y)
+  n=Int(length(s)/2)
   value_estimate=0
   for i=1:n
     value_estimate+=value(policy, (s[2*i-1],s[2*i]))
   end
   return value_estimate
 end
-solver_mcts = MCTSSolver(n_iterations=1000, depth=30, exploration_constant=0.1,estimate_value=vi_estimate) # initializes the Solver type
-planner_mcts = solve(solver_mcts, m2)
-#reward((1,2,1,2))
-ds = DisplaySimulator()
-simulate(ds,m2,planner_mcts)
 
-#print("running simulation")
-#r = HistoryRecorder(max_steps=150)
-#roller=RolloutSimulator(max_steps=20)
-#h = simulate(hr, m2, planner_mcts)
-#print(test((25,28,2,4),(2,3)))
-#collect(eachstep(h, "s,a"))
+coordinates = statespace(1)
+
+x = 1:30
+y = 1:30
+
+
+f(x,y) = begin
+    vi_estimate(Int(x),Int(y))
+end
+
+
+# for c in coordinates
+#     #append!(x,c[1])
+#     #append!(y,c[2])
+#     append!(Utility,vi_estimate(m1,c,1))
+# end
+
+contour(x, y, f, fill=true, levels = 20,color=:turbo,title= "Utility Function",xlabel ="x", ylabel = "y" )
 

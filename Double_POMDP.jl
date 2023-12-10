@@ -10,7 +10,7 @@ using ARDESPOT
 using Statistics
 using Random
 using StatsBase
-
+using D3Trees
 ElectronDisplay.CONFIG.single_window = true
 plot([15],[15],xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 8,legend = false,color = :green)
 
@@ -338,7 +338,7 @@ m2 = QuickPOMDP(
 #print(test((25,28,2,4),(2,3)))
 #collect(eachstep(h, "s,a"))
 
-adaoposolver = DESPOTSolver(bounds=(-500, 300))
+adaoposolver = DESPOTSolver(bounds=(-500, 300),tree_in_info=true)
 policy=solve(adaoposolver,m2)
 
 rnd = solve(RandomSolver(MersenneTwister(10)), m2)
@@ -353,15 +353,23 @@ println("The discounted reward from one simulation is")
 println("________________________________")
 
 
-# q = [] # vector of the simulations to be run
-# push!(q, Sim(m2, policy, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"DESPOT Policy")))
-# push!(q, Sim(m2, rnd, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Random")))
+q = [] # vector of the simulations to be run
+push!(q, Sim(m2, policy, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"DESPOT Policy")))
+push!(q, Sim(m2, rnd, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Random")))
 
-# println("Running Monte Carlo Simulation")
+println("Running Monte Carlo Simulation")
 
-# data = run_parallel(q,proc_warn=false)
-# println(data)
-# println("_________________________")
+data = run_parallel(q,proc_warn=false)
+println(data)
+println("_________________________")
+
+b0 = initialstate(m2)
+
+a, info = action_info(policy, b0)
+inchrome(D3Tree(info[:tree], init_expand=5))
+
 
 ds = DisplaySimulator(max_steps = 25)
 simulate(ds,m2,policy)
+
+
