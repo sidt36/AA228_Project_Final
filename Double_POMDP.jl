@@ -353,15 +353,15 @@ println("The discounted reward from one simulation is")
 println("________________________________")
 
 
-q = [] # vector of the simulations to be run
-push!(q, Sim(m2, policy, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"DESPOT Policy")))
-push!(q, Sim(m2, rnd, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Random")))
+# q = [] # vector of the simulations to be run
+# push!(q, Sim(m2, policy, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"DESPOT Policy")))
+# push!(q, Sim(m2, rnd, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Random")))
 
-println("Running Monte Carlo Simulation")
+# println("Running Monte Carlo Simulation")
 
-data = run_parallel(q,proc_warn=false)
-println(data)
-println("_________________________")
+# data = run_parallel(q,proc_warn=false)
+# println(data)
+# println("_________________________")
 
 ds = DisplaySimulator(max_steps = 25)
 simulate(ds,m2,policy)
