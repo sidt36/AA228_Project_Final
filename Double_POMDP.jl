@@ -238,7 +238,6 @@ m1 = QuickPOMDP(
     render = function (step)
         cx = [step.s[i] for i = 1:2:2*ns]
         cy = [step.s[i] for i = 2:2:2*ns]
-        println(pdf(step.b, step.s))
         color = [:blue, :red,:green]
         return plot!(cx,cy,xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 4*pdf(step.b, step.s),legend = false, color = color[1:ns])
       end,
@@ -254,7 +253,7 @@ m2 = QuickPOMDP(
     states = statespace(ns) ,
     actions = action_space(ns) ,
     #initialstate = Uniform(state_space(ns)),
-    initialstate=Uniform([(9,9,18,17),(9,10,19,17)]),
+    initialstate=Uniform([(13,13,22,21),(13,14,21,22)]),
     #initialstate=Deterministic((9,9,18,17)),
     discount = 0.8,
     observations = statespace(ns),
@@ -290,7 +289,6 @@ m2 = QuickPOMDP(
     render = function (step)
         cx = [step.s[i] for i = 1:2:2*ns]
         cy = [step.s[i] for i = 2:2:2*ns]
-        println(pdf(step.b, step.s))
         color = [:blue, :red,:green]
         return plot!(cx,cy,xlims = (0,31),ylims = (0,31),seriestype=:scatter,ms = 4*pdf(step.b, step.s),legend = false, color = color[1:ns])
       end,
@@ -340,10 +338,10 @@ m2 = QuickPOMDP(
 #print(test((25,28,2,4),(2,3)))
 #collect(eachstep(h, "s,a"))
 
-adaoposolver = DESPOTSolver(bounds=(-750, 750))
+adaoposolver = DESPOTSolver(bounds=(-500, 300))
 policy=solve(adaoposolver,m2)
 
-rnd = solve(RandomSolver(MersenneTwister(7)), m1)
+rnd = solve(RandomSolver(MersenneTwister(10)), m2)
 hr = HistoryRecorder(max_steps=150)
 roller=RolloutSimulator(max_steps=20)
 
@@ -356,7 +354,7 @@ println("________________________________")
 
 
 q = [] # vector of the simulations to be run
-push!(q, Sim(m2, policy, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"QMDP Policy")))
+push!(q, Sim(m2, policy, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"DESPOT Policy")))
 push!(q, Sim(m2, rnd, max_steps=30, rng=MersenneTwister(4), metadata=Dict(:policy=>"Random")))
 
 println("Running Monte Carlo Simulation")
@@ -366,4 +364,4 @@ println(data)
 println("_________________________")
 
 ds = DisplaySimulator(max_steps = 25)
-simulate(ds,m1,policy)
+simulate(ds,m2,policy)

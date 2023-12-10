@@ -8,3 +8,14 @@ Running Monte Carlo Simulation
    1 │ QMDP Policy    73.3886
    2 │ Random       -958.143
 _________________________
+
+2 aircraft
+________________________________
+Running Monte Carlo Simulation
+2×2 DataFrame
+ Row │ policy         reward
+     │ String?        Float64?
+─────┼─────────────────────────
+   1 │ DESPOT Policy   393.187
+   2 │ Random          360.552
+_________________________
